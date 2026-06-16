@@ -1,0 +1,11 @@
+% Pick the territory with the lowest number of troops and dump all new troops in it
+fortify(MIN_TROOP_TERRITORY, TROOPS) :- phase(fortify), my_id(USER), to_fortify(TROOPS), #min{TROOP_COUNT :  armies_present(TERRITORY, TROOP_COUNT), owner(TERRITORY, USER), my_id(USER)} = MIN_TROOP_COUNT, armies_present(MIN_TROOP_TERRITORY, MIN_TROOP_COUNT), owner(MIN_TROOP_TERRITORY, USER).
+
+% Pass when it comes to the choose phase
+pass :- phase(choose).
+
+% -------------- Not working, ignore this ---------------
+% Put a random number of troops in a random territory
+% 0 < {fortify(TERRITORY, TROOPS) : owner(TERRITORY, USER), my_id(USER), &rand(1, TROOP_COUNT; TROOPS), to_fortify(TROOP_COUNT), COUNT = TROOP_COUNT} <= COUNT :- phase(fortify), to_fortify(COUNT).
+% Make sure the random choice contains the correct number of troops to place
+% :- #sum{TROOPS, TERRITORY : fortify(TERRITORY, TROOPS)} != COUNT, to_fortify(COUNT).
