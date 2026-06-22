@@ -36,10 +36,10 @@ no_attack(MT, ET) :- enemy_neighbor(MT, ET), armies_present(MT, MA), MA < 2.
 :- #count{MT, ET : attack(MT, ET)} > 1.
 
 % Prefer to attack when MT army count minus ET army count is the greatest
-:~ attack(MT, ET), armies_present(MT, MA), armies_present(ET, EA), MA - EA = DIFF. [-DIFF@4]
+:~ attack(MT, ET), armies_present(MT, MA), armies_present(ET, EA), MA - EA = DIFF. [-DIFF@5]
 
 % lower priority: prefer to attack an enemy on the same continent
-:~ attack(MT, ET), in_continent(MT, C), in_continent(ET, C). [-1@3]
+:~ attack(MT, ET), in_continent(MT, C1), in_continent(ET, C2), C1 != C2. [1@4]
 
 % Attack across to another continent if we have a certian higher amount of troops (say like + (1/3) * num of enemy troops)
 
@@ -53,11 +53,13 @@ no_attack(MT, ET) :- enemy_neighbor(MT, ET), armies_present(MT, MA), MA < 2.
 :- #count{MT1, MT2 : move(MT1, MT2, _)} > 1.
 
 % We prefer to move armies from a territory without nearby enemies
-:~ move(MT1, MT2, A), enemy_neighbor(MT1, ET). [1@2]
+:~ move(MT1, MT2, A), enemy_neighbor(MT1, ET). [1@3]
 % We prefer to move armies to an MT on the same continent
-:~ move(MT1, MT2, A), in_continent(MT1, C1), in_continent(MT2, C2), C1 != C2. [1@1]
+:~ move(MT1, MT2, A), in_continent(MT1, C1), in_continent(MT2, C2), C1 != C2. [1@2]
 % It cannot be the case that we move to an MT without nearby enemies
 :- move(MT1, MT2, A), not enemy_neighbor(MT2, ET), my_territory(MT2), territory(ET).
+% Prefer to move armies to cross country connections in order to block off continents
+:~ move(MT1, MT2, A), enemy_neighbor(MT2, ET), in_continent(MT2, C), in_continent(ET, C). [1@1]
 
 % PASS
 % If choosing, no attack, and no move, pass
