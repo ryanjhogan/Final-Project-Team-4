@@ -1,11 +1,41 @@
-% Pick the territory with the lowest number of troops and dump all new troops in it
-fortify(MIN_TROOP_TERRITORY, TROOPS) :- phase(fortify), my_id(USER), to_fortify(TROOPS), #min{TROOP_COUNT :  armies_present(TERRITORY, TROOP_COUNT), owner(TERRITORY, USER), my_id(USER)} = MIN_TROOP_COUNT, armies_present(MIN_TROOP_TERRITORY, MIN_TROOP_COUNT), owner(MIN_TROOP_TERRITORY, USER).
+%------------ Helper Predicates -------------
+my_territories(MT) :- territory(MT), owner(MT, X), my_id(X).
 
-% Pass when it comes to the choose phase
-pass :- phase(choose).
 
-% -------------- Not working, ignore this ---------------
-% Put a random number of troops in a random territory
-% 0 < {fortify(TERRITORY, TROOPS) : owner(TERRITORY, USER), my_id(USER), &rand(1, TROOP_COUNT; TROOPS), to_fortify(TROOP_COUNT), COUNT = TROOP_COUNT} <= COUNT :- phase(fortify), to_fortify(COUNT).
-% Make sure the random choice contains the correct number of troops to place
-% :- #sum{TROOPS, TERRITORY : fortify(TERRITORY, TROOPS)} != COUNT, to_fortify(COUNT).
+%--------------- Fortify Phase --------------
+% All armies will be assigned to only one of our territories
+{fortify(MT, TROOPS) : my_territories(MT), to_fortify(TROOPS)} = 1 :- phase(fortify).
+
+% Satisfy these constraints if possible:
+% - fortify the territory with the least number of armies present
+:~ fortify(MT, TROOPS), armies_present(MT, ARMIES). [ARMIES@1, MT]
+% - fortify the territory with the largest number of neighboring enemy troops
+:~ fortify(MT, TROOPS), neighbor(MT, ET), not owner(ET, 0), armies_present(ET, ARMIES). [-ARMIES@1, MT]
+
+#show fortify/2.
+
+
+% ------------ Attacking Phase -------------
+% Build sets of all attackable territories
+{attack(MT, ET) : my_territories(MT), neighbor(MT, ET), armies_present(MT, M_ARMIES), armies_present(ET, E_ARMIES), E_ARMIES < M_ARMIES, M_ARMIES >= 2; pass} = 1 :- phase(choose).
+% Ignore passing as a solution unless no better solution
+:~ pass. [1000@1]
+% Attack if you have more troops than them, MT troop count - ET troop count > 0
+% Prefer the highest troop difference when attacking
+:~ attack(MT, ET), armies_present(MT, M_ARMIES), armies_present(ET, E_ARMIES), M_ARMIES - E_ARMIES = DIFF. [-DIFF@1, E_ARMIES, M_ARMIES, MT, ET]
+% Prefer attacking territories with weaker surrounding territories
+:~ attack(MT, ET1), #sum{E_ARMIES, ET2 : armies_present(ET2, E_ARMIES), neighbor(ET1, ET2), not my_territories(ET2)} = SURROUNDING_E_ARMIES. [SURROUNDING_E_ARMIES@1, MT, ET1]
+% Attack territories in the same continent
+:~ attack(MT, ET), in_continent(MT, CONTINENT), in_continent(ET, CONTINENT). [-1@1, MT, ET, CONTINENT]
+
+
+#show attack/2.
+#show pass/0.
+
+% ------------ Conquer Phase -------------
+% Move either one troop or all troops
+{move(MT, ET, 1) ; move(MT, ET, M_ARMIES - 1)} = 1 :- conquered(MT, ET), armies_present(MT, M_ARMIES).
+% Move more armies into territories that are surrounded by enemies
+:~ move(MT, ET, MOVE_ARMIES), #sum{E_ARMIES, SURROUNDING_T : armies_present(SURROUNDING_T, E_ARMIES), neighbor(ET, SURROUNDING_T), not my_territories(SURROUNDING_T)} = TOTAL_SURROUNDING_ARMIES, MOVE_ARMIES - TOTAL_SURROUNDING_ARMIES = DIFF. [DIFF@1, DIFF, TOTAL_SURROUNDING_ARMIES, MOVE_ARMIES]
+
+#show move/3.

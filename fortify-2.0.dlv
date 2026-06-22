@@ -1,0 +1,94 @@
+% Always leave commented unless needed for testing
+% phase(fortify).
+% phase(choose).
+% phase(conquer).
+% to_fortify(4).
+
+% The territories we own
+my_territory(MT) :- territory(MT), owner(MT, X), my_id(X).
+% Enemy territories neighboring our territories
+enemy_neighbor(MT, ET) :- my_territory(MT), neighbor(MT, ET), not my_territory(ET).
+
+%% ================== FORTIFY ==================
+% All armies will be assigned to only one of our territories
+{fortify(MT, TROOPS) : my_territory(MT), to_fortify(TROOPS)} = 1 :- phase(fortify).
+
+% Satisfy these constraints if possible:
+% - fortify the territory with the least number of armies present
+:~ fortify(MT, TROOPS), armies_present(MT, ARMIES). [ARMIES@3, MT]
+% - fortify the territory with the largest number of neighboring enemy troops
+:~ fortify(MT, TROOPS), enemy_neighbor(MT, ET), armies_present(ET, ARMIES). [-ARMIES@3, MT]
+
+%% ==================  CHOOSE  ==================
+% ATTACK:
+% If an MT is neighbors with an enemy, they can either attack or not attack
+attack(MT, ET) | no_attack(MT, ET) :- enemy_neighbor(MT, ET), phase(choose).
+
+% If you have less troops than an enemy neighbor, no_attack
+no_attack(MT, ET) :- enemy_neighbor(MT, ET), armies_present(MT, MA), armies_present(ET, EA), MA - EA <= 0.
+% If you don't have at least 2 troops, no_attack
+no_attack(MT, ET) :- enemy_neighbor(MT, ET), armies_present(MT, MA), MA < 2.
+
+% It cannot be the case that an answer set has more than 1 attack
+:- #count{MT, ET : attack(MT, ET)} > 1.
+
+% Prefer to attack when MT army count - ET army count is the greatest
+:~ attack(MT, ET), armies_present(MT, MA), armies_present(ET, EA), MA - EA = DIFF. [-DIFF@2]
+
+% lower priority: prefer to attack an enemy on the same continent
+:~ attack(MT, ET), in_continent(MT, C), in_continent(ET, C). [-1@1]
+
+% PASS
+% If no attack, pass
+pass :- #count{MT, ET : attack(MT, ET)} = 0.
+
+%% ================== CONQUER ==================
+% Once MT conquers ET, move all but one army from MT to ET
+%move(MT, ET, MA-1) :- neighbor(MT, ET), my_territory(MT), armies_present(MT, MA), conquered(MT, ET), phase(conquer).
+
+% Once MT conquers ET, either one army or all but one army can be moved from MT to ET
+%move(MT, ET, 1) | move(MT, ET, MA-1) :- my_territory(MT), conquered(MT, ET), armies_present(MT, MA), phase(conquer).
+
+% Given a conquered territory ET, determine if ET has any enemy territories
+% although ET's id will not be the same as ours yet, assume it does have our id
+% If MT conquered ET, ET will have an enemy nearby if a neighbor is not one of our territories
+has_enemy_nearby(ET) :- my_territory(MT), conquered(MT, ET), neighbor(ET, ENEMY), not my_territory(ENEMY).
+
+% 
+move(MT, CT, MA-1) :- my_territory(MT), conquered(MT, CT), armies_present(MT, MA), has_enemy_nearby(CT), #count{ET : enemy_neighbor(MT, ET), ET != CT} = 0.
+move(MT, CT, 1) :- my_territory(MT), conquered(MT, CT), not has_enemy_nearby(CT), enemy_neighbor(MT, ET), ET != CT.
+move(MT, CT, 1) :- my_territory(MT), conquered(MT, CT), not has_enemy_nearby(CT), #count{ET : enemy_neighbor(MT, ET), ET != CT} = 0.
+
+move(MT, CT, 1) :- my_territory(MT), conquered(MT, CT), has_enemy_nearby(CT), enemy_neighbor(MT, ET), ET != CT.
+
+% Testing has_enemy_nearby:
+% conquered(11, 12).  % Expected: {has_enemy_nearby(12)}
+% conquered(26, 25).    % Expected: {}
+% #show has_enemy_nearby/1.
+% #show conquered/2.
+
+% Testing move:
+% Test case: MT has enemies, CT does not
+% conquered(21, 19). % Expected: move 1
+% Test case: CT has enemies, MT does not
+% conquered(14, 15).  % Expected: move MA-1
+% Test case: Neither MT nor CT have enemies
+% conquered(26, 25).  % Expected: move 1
+% Test case: Both MT and CT have enemies
+% conquered(2, 1).
+
+% Always leave commented unless needed for testing
+% #show attack/2.
+#show move/3.
+
+% CHOOSE PHASE: MOVING ARMIES
+% if an MT has no enemy neighbors and more than 1 army, move all but 1 army to another MT that has enemy neighbors
+% all MTs that have no enemy neighbors should always have only 1 troop each
+
+% ------------ Conquer Phase -------------
+% Move either one troop or all troops
+% {move(MT, ET, 1) ; move(MT, ET, M_ARMIES - 1)} = 1 :- conquered(MT, ET), armies_present(MT, M_ARMIES).
+% % Move more armies into territories that are surrounded by enemies
+% :~ move(MT, ET, MOVE_ARMIES), #sum{E_ARMIES, SURROUNDING_T : armies_present(SURROUNDING_T, E_ARMIES), neighbor(ET, SURROUNDING_T), not my_territories(SURROUNDING_T)} = TOTAL_SURROUNDING_ARMIES, MOVE_ARMIES - TOTAL_SURROUNDING_ARMIES = DIFF. [DIFF@1, DIFF, TOTAL_SURROUNDING_ARMIES, MOVE_ARMIES]
+
+% #show move/3.

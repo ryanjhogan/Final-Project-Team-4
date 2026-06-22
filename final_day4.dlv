@@ -1,0 +1,86 @@
+% Always leave commented unless needed for testing
+% phase(fortify).
+phase(choose).
+% phase(conquer).
+% to_fortify(4).
+
+% The territories we own
+my_territory(MT) :- territory(MT), owner(MT, X), my_id(X).
+% Enemy territories neighboring our territories
+enemy_neighbor(MT, ET) :- my_territory(MT), neighbor(MT, ET), not my_territory(ET).
+
+%% ================== FORTIFY ==================
+% All armies will be assigned to only one of our territories
+{fortify(MT, TROOPS) : my_territory(MT), to_fortify(TROOPS)} = 1 :- phase(fortify).
+
+% Satisfy these constraints if possible:
+% - fortify the territory with the least number of armies present
+:~ fortify(MT, TROOPS), armies_present(MT, ARMIES). [ARMIES, MT]
+% - fortify the territory with the largest number of neighboring enemy troops
+:~ fortify(MT, TROOPS), enemy_neighbor(MT, ET), armies_present(ET, ARMIES). [-ARMIES, MT]
+
+% enemy_armies(MT, EA) :- #sum{ARMIES, MT1 : enemy_neighbor(MT1, ET), armies_present(ET, ARMIES), MT = MT1} = EA, my_territory(MT).
+% Given the above rule, we should fortify 11. 11 has 45 neighboring enemy troops, the most out of all other territories.
+% #show enemy_armies/2.
+
+%% ==================  CHOOSE  ==================
+% ATTACK:
+% If an MT is neighbors with an enemy, they can either attack or not attack
+attack(MT, ET) | no_attack(MT, ET) :- phase(choose), enemy_neighbor(MT, ET).
+
+% If you have less troops than an enemy neighbor, no_attack
+no_attack(MT, ET) :- enemy_neighbor(MT, ET), armies_present(MT, MA), armies_present(ET, EA), MA - EA <= 0.
+% If you don't have at least 2 troops, no_attack
+no_attack(MT, ET) :- enemy_neighbor(MT, ET), armies_present(MT, MA), MA < 2.
+
+% It cannot be the case that an answer set has more than 1 attack
+:- #count{MT, ET : attack(MT, ET)} > 1.
+
+% Prefer to attack when MT army count minus ET army count is the greatest
+:~ attack(MT, ET), armies_present(MT, MA), armies_present(ET, EA), MA - EA = DIFF. [-DIFF@3]
+
+% lower priority: prefer to attack an enemy on the same continent
+:~ attack(MT, ET), in_continent(MT, C), in_continent(ET, C). [-1@2]
+
+% MOVE
+{move(MT1, MT2, MA-1)} :- phase(choose), #count{1 : attack(MT, ET)} = 0, my_territory(MT1),
+    my_territory(MT2), armies_present(MT1, MA), neighbor(MT1, MT2).
+
+:- #count{MT1, MT2 : move(MT1, MT2, _)} > 1.
+
+% PASS
+% If choosing, no attack, and no move, pass
+pass :- phase(choose), #count{1 : attack(MT, ET)} = 0, #count{1 : move(MT1, MT2, A)} = 0.
+
+%% ================== CONQUER ==================
+% A conquered territory CT has enemies nearby if at least one neighbor is not our territory
+has_enemy_nearby(CT) :- my_territory(MT), conquered(MT, CT), neighbor(CT, ET), not my_territory(ET).
+
+% Move one army if CT doesn't have nearby enemies
+move(MT, CT, 1) :- my_territory(MT), conquered(MT, CT), not has_enemy_nearby(CT).
+% Move all but one army if CT has nearby enemies
+move(MT, CT, MA-1) :- my_territory(MT), conquered(MT, CT), has_enemy_nearby(CT), armies_present(MT, MA).
+
+% Testing has_enemy_nearby:
+% conquered(11, 12).  % Expected: {has_enemy_nearby(12)}
+% conquered(26, 25).    % Expected: {}
+#show has_enemy_nearby/1.
+
+% Always leave commented unless needed for testing
+#show attack/2.
+#show move/3.
+#show pass/0.
+#show conquered/2.
+% #show fortify/2.
+
+% CHOOSE PHASE: MOVING ARMIES
+% if an MT has no enemy neighbors and more than 1 army, move all but 1 army to another MT that has enemy neighbors
+% all MTs that have no enemy neighbors should always have only 1 troop each
+
+% ------------ Conquer Phase -------------
+% Move either one troop or all troops
+% {move(MT, ET, 1) ; move(MT, ET, M_ARMIES - 1)} = 1 :- conquered(MT, ET), armies_present(MT, M_ARMIES).
+% % Move more armies into territories that are surrounded by enemies
+% :~ move(MT, ET, MOVE_ARMIES), #sum{E_ARMIES, SURROUNDING_T : armies_present(SURROUNDING_T, E_ARMIES), neighbor(ET, SURROUNDING_T), not my_territories(SURROUNDING_T)} = TOTAL_SURROUNDING_ARMIES, MOVE_ARMIES - TOTAL_SURROUNDING_ARMIES = DIFF. [DIFF@1, DIFF, TOTAL_SURROUNDING_ARMIES, MOVE_ARMIES]
+
+% #show move/3.

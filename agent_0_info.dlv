@@ -51,8 +51,11 @@ owner(6,1).
 owner(7,1).
 owner(8,2).
 owner(9,0).
-phase(fortify).
 
 
 % Added
-to_fortify(4).
+phase(fortify).
+to_fortify(15).
+
+% Conquered code
+% conquered(26, 25).
